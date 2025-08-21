@@ -1,4 +1,5 @@
 import tkinter as tk
+from tkinter import ttk
 from tkinter import filedialog, messagebox
 from styles import DARK_BG, DARK_FG, DARK_ACCENT, DARK_BTN_BG, DARK_BTN_FG, DARK_ENTRY_BG, DARK_ENTRY_FG, DARK_HIGHLIGHT
 from styles import DARK_BTN_PREVIEW_ACTIVE, DARK_BTN_PREVIEW_INACTIVE
@@ -92,9 +93,26 @@ class ExcelMergerApp:
         center_frame.pack(side='left', fill='both', expand=True)
         self.preview_label = tk.Label(center_frame, text='Предпросмотр: Результат', bg=DARK_BG, fg=DARK_FG)
         self.preview_label.pack(anchor='nw')
-        self.text = tk.Text(center_frame, wrap='none', width=100, height=40, bg=DARK_ACCENT, fg=DARK_FG, insertbackground=DARK_FG, selectbackground=DARK_HIGHLIGHT)
-        self.text.pack(fill='both', expand=True, padx=5, pady=5)
-        self.text.config(state='disabled')
+    
+        style = ttk.Style()
+        style.theme_use('default')
+        style.configure('Treeview',
+            background=DARK_ACCENT,
+            foreground=DARK_FG,
+            fieldbackground=DARK_ACCENT,
+            rowheight=28)
+        style.configure('Treeview.Heading',
+            background=DARK_HIGHLIGHT,
+            foreground=DARK_BG,
+            font=('Segoe UI', 10, 'bold'))
+        style.map('Treeview', background=[('selected', DARK_BTN_BG)])
+        self.tree = ttk.Treeview(center_frame, show='headings')
+        self.tree.pack(fill='both', expand=True, padx=5, pady=5)
+        self.tree_scroll = ttk.Scrollbar(center_frame, orient='vertical', command=self.tree.yview)
+        self.tree_scroll_x = ttk.Scrollbar(center_frame, orient='horizontal', command=self.tree.xview)
+        self.tree.configure(yscrollcommand=self.tree_scroll.set, xscrollcommand=self.tree_scroll_x.set)
+        self.tree_scroll.pack(side='right', fill='y')
+        self.tree_scroll_x.pack(side='bottom', fill='x')
 
         # Скрыть splash через 2.5 секунды и показать основной интерфейс
         self.root.after(2500, self.hide_splash_and_show_main)
@@ -154,9 +172,9 @@ class ExcelMergerApp:
                 lbl.config(bg=DARK_HIGHLIGHT, fg=DARK_BG)
             else:
                 lbl.config(bg=DARK_BG, fg=DARK_FG)
-        # Кнопка предпросмотра активна только если выбран отдельный лист
+        # Кнопка предпросмотра активна всегда, если есть предпросмотр
         from styles import DARK_BTN_PREVIEW_ACTIVE, DARK_BTN_PREVIEW_INACTIVE
-        if self.active_sheet_name:
+        if self.preview_df is not None and not self.preview_df.empty:
             self.btn_show_preview.config(state='normal', bg=DARK_BTN_PREVIEW_ACTIVE)
         else:
             self.btn_show_preview.config(state='disabled', bg=DARK_BTN_PREVIEW_INACTIVE)
@@ -171,10 +189,7 @@ class ExcelMergerApp:
             try:
                 df = pd.read_excel(self.last_merge_file_path, sheet_name=sheet_name)
             except Exception as e:
-                self.text.config(state='normal')
-                self.text.delete('1.0', tk.END)
-                self.text.insert('end', f'Ошибка чтения листа: {e}')
-                self.text.config(state='disabled')
+                self.show_tree_error(f'Ошибка чтения листа: {e}')
                 return
         elif self.last_merge_folder_path:
             import os
@@ -191,20 +206,17 @@ class ExcelMergerApp:
                     except Exception:
                         continue
         if df is not None:
-            self.text.config(state='normal')
-            self.text.delete('1.0', tk.END)
-            self.text.insert('end', df.head(100).to_string(index=False))
-            self.text.config(state='disabled')
+            self.show_preview(df)
         else:
-            self.text.config(state='normal')
-            self.text.delete('1.0', tk.END)
-            self.text.insert('end', 'Не удалось загрузить лист или он пустой.')
-            self.text.config(state='disabled')
+            self.show_tree_error('Не удалось загрузить лист или он пустой.')
 
     def show_merge_preview(self):
         self.active_sheet_name = None
         self.preview_label.config(text='Предпросмотр: Результат')
         self.update_active_sheet_highlight()
+        # Сбросить выделение чекбоксов
+        for var, _ in self.sheet_vars:
+            var.set(False)
         self.show_preview(self.preview_df)
 
     def delete_selected_sheets(self):
@@ -245,13 +257,29 @@ class ExcelMergerApp:
             self.btn_export.config(state='normal')
 
     def show_preview(self, preview_df):
-        self.text.config(state='normal')
-        self.text.delete('1.0', tk.END)
-        if preview_df is not None:
-            self.text.insert('end', preview_df.to_string(index=False))
-        self.text.config(state='disabled')
+        self.tree.delete(*self.tree.get_children())
+        self.tree['columns'] = ()
+        if preview_df is not None and not preview_df.empty:
+            columns = ['№'] + list(preview_df.columns)
+            self.tree['columns'] = columns
+            self.tree.heading('№', text='№')
+            self.tree.column('№', anchor='center', width=40, minwidth=30)
+            for col in preview_df.columns:
+                self.tree.heading(col, text=col)
+                self.tree.column(col, anchor='w', width=180, minwidth=60)
+            for idx, (_, row) in enumerate(preview_df.iterrows(), 1):
+                tag = 'alt' if idx % 2 == 0 else ''
+                self.tree.insert('', 'end', values=[idx] + list(row), tags=(tag,))
+            self.tree.tag_configure('alt', background='#23262b')
         self.active_sheet_name = None
         self.update_active_sheet_highlight()
+
+    def show_tree_error(self, message):
+        self.tree.delete(*self.tree.get_children())
+        self.tree['columns'] = ('Ошибка',)
+        self.tree.heading('Ошибка', text='Ошибка')
+        self.tree.column('Ошибка', anchor='center', width=400)
+        self.tree.insert('', 'end', values=(message,))
 
     def export_to_excel(self):
         if self.preview_df is not None:
