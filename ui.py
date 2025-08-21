@@ -106,13 +106,18 @@ class ExcelMergerApp:
             foreground=DARK_BG,
             font=('Segoe UI', 10, 'bold'))
         style.map('Treeview', background=[('selected', DARK_BTN_BG)])
-        self.tree = ttk.Treeview(center_frame, show='headings')
-        self.tree.pack(fill='both', expand=True, padx=5, pady=5)
-        self.tree_scroll = ttk.Scrollbar(center_frame, orient='vertical', command=self.tree.yview)
-        self.tree_scroll_x = ttk.Scrollbar(center_frame, orient='horizontal', command=self.tree.xview)
+    # --- Новый layout для Treeview и скроллбаров ---
+        tree_frame = tk.Frame(center_frame, bg=DARK_BG)
+        tree_frame.pack(fill='both', expand=True, padx=5, pady=5)
+        self.tree = ttk.Treeview(tree_frame, show='headings')
+        self.tree_scroll = ttk.Scrollbar(tree_frame, orient='vertical', command=self.tree.yview)
+        self.tree_scroll_x = ttk.Scrollbar(tree_frame, orient='horizontal', command=self.tree.xview)
         self.tree.configure(yscrollcommand=self.tree_scroll.set, xscrollcommand=self.tree_scroll_x.set)
-        self.tree_scroll.pack(side='right', fill='y')
-        self.tree_scroll_x.pack(side='bottom', fill='x')
+        self.tree.grid(row=0, column=0, sticky='nsew')
+        self.tree_scroll.grid(row=0, column=1, sticky='ns')
+        self.tree_scroll_x.grid(row=1, column=0, sticky='ew')
+        tree_frame.grid_rowconfigure(0, weight=1)
+        tree_frame.grid_columnconfigure(0, weight=1)
 
         # Скрыть splash через 2.5 секунды и показать основной интерфейс
         self.root.after(2500, self.hide_splash_and_show_main)
