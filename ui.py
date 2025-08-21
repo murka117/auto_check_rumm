@@ -270,10 +270,11 @@ class ExcelMergerApp:
             columns = list(preview_df.columns)
             self.tree['columns'] = columns
             self.tree.heading('#0', text='№')
-            self.tree.column('#0', anchor='center', width=50, minwidth=40, stretch=False)
+            self.tree.column('#0', anchor='center', width=60, minwidth=50, stretch=False)
             for col in preview_df.columns:
                 self.tree.heading(col, text=col)
-                self.tree.column(col, anchor='w', width=180, minwidth=60)
+                # Увеличиваем ширину и minwidth для предотвращения обрезки
+                self.tree.column(col, anchor='w', width=200, minwidth=120)
             for idx, (_, row) in enumerate(preview_df.iterrows(), 1):
                 alt = 'alt' if idx % 2 == 0 else ''
                 tags = (alt,) if alt else ()
