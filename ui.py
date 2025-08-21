@@ -264,18 +264,30 @@ class ExcelMergerApp:
     def show_preview(self, preview_df):
         self.tree.delete(*self.tree.get_children())
         self.tree['columns'] = ()
+        # Используем column #0 для нумерации строк (визуально, не в данных)
+        self.tree['show'] = 'tree headings'
         if preview_df is not None and not preview_df.empty:
-            columns = ['№'] + list(preview_df.columns)
+            columns = list(preview_df.columns)
             self.tree['columns'] = columns
-            self.tree.heading('№', text='№')
-            self.tree.column('№', anchor='center', width=40, minwidth=30)
+            self.tree.heading('#0', text='№')
+            self.tree.column('#0', anchor='center', width=50, minwidth=40, stretch=False)
             for col in preview_df.columns:
                 self.tree.heading(col, text=col)
                 self.tree.column(col, anchor='w', width=180, minwidth=60)
             for idx, (_, row) in enumerate(preview_df.iterrows(), 1):
-                tag = 'alt' if idx % 2 == 0 else ''
-                self.tree.insert('', 'end', values=[idx] + list(row), tags=(tag,))
+                alt = 'alt' if idx % 2 == 0 else ''
+                tags = (alt,) if alt else ()
+                # Добавляем символ ▸ после номера для визуального выделения нумерации
+                num_text = f'{idx} ▸'
+                self.tree.insert('', 'end', text=num_text, values=list(row), tags=tags)
             self.tree.tag_configure('alt', background='#23262b')
+            # Общий стиль для строк и заголовков
+            style = ttk.Style()
+            style.configure('Treeview', rowheight=28)
+            style.configure('Treeview.Item', font=('Segoe UI', 10))
+            style.configure('Treeview', foreground=DARK_FG)
+            style.configure('Treeview.Heading', font=('Segoe UI', 10, 'bold'))
+            style.map('Treeview', foreground=[('selected', DARK_FG)])
         self.update_active_sheet_highlight()
 
     def show_tree_error(self, message):
