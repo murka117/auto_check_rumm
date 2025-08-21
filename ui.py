@@ -61,7 +61,7 @@ class ExcelMergerApp:
         self.btn_export.pack(side='left', padx=5, pady=5)
     # Кнопка возврата к предпросмотру
     
-        self.btn_show_preview = tk.Button(top_frame, text='К предпросмотру', command=self.show_merge_preview, state='disabled', bg=DARK_BTN_PREVIEW_INACTIVE, fg=DARK_BTN_FG, activebackground=DARK_ACCENT, activeforeground=DARK_FG)
+        self.btn_show_preview = tk.Button(top_frame, text='К предпросмотру', command=self.show_merge_preview, state='disabled', bg=DARK_BTN_BG, fg=DARK_BTN_FG, activebackground=DARK_ACCENT, activeforeground=DARK_FG)
         self.btn_show_preview.pack(side='left', padx=5, pady=5)
 
         # Список листов слева с чекбоксами
@@ -172,12 +172,12 @@ class ExcelMergerApp:
                 lbl.config(bg=DARK_HIGHLIGHT, fg=DARK_BG)
             else:
                 lbl.config(bg=DARK_BG, fg=DARK_FG)
-        # Кнопка предпросмотра активна всегда, если есть предпросмотр
+        # Кнопка предпросмотра активна только если выбран отдельный лист
         from styles import DARK_BTN_PREVIEW_ACTIVE, DARK_BTN_PREVIEW_INACTIVE
-        if self.preview_df is not None and not self.preview_df.empty:
-            self.btn_show_preview.config(state='normal', bg=DARK_BTN_PREVIEW_ACTIVE)
+        if self.active_sheet_name:
+            self.btn_show_preview.config(state='normal', bg=DARK_BTN_BG, fg=DARK_BTN_FG)
         else:
-            self.btn_show_preview.config(state='disabled', bg=DARK_BTN_PREVIEW_INACTIVE)
+            self.btn_show_preview.config(state='disabled', bg=DARK_BTN_BG, fg=DARK_BTN_FG)
 
     def show_sheet_content(self, sheet_name):
         self.active_sheet_name = sheet_name
@@ -271,7 +271,6 @@ class ExcelMergerApp:
                 tag = 'alt' if idx % 2 == 0 else ''
                 self.tree.insert('', 'end', values=[idx] + list(row), tags=(tag,))
             self.tree.tag_configure('alt', background='#23262b')
-        self.active_sheet_name = None
         self.update_active_sheet_highlight()
 
     def show_tree_error(self, message):
