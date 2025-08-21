@@ -90,7 +90,8 @@ class ExcelMergerApp:
         # Центр — предпросмотр
         center_frame = tk.Frame(self.main_frame, bg=DARK_BG)
         center_frame.pack(side='left', fill='both', expand=True)
-        tk.Label(center_frame, text='Предпросмотр объединения', bg=DARK_BG, fg=DARK_FG).pack(anchor='nw')
+        self.preview_label = tk.Label(center_frame, text='Предпросмотр: Результат', bg=DARK_BG, fg=DARK_FG)
+        self.preview_label.pack(anchor='nw')
         self.text = tk.Text(center_frame, wrap='none', width=100, height=40, bg=DARK_ACCENT, fg=DARK_FG, insertbackground=DARK_FG, selectbackground=DARK_HIGHLIGHT)
         self.text.pack(fill='both', expand=True, padx=5, pady=5)
         self.text.config(state='disabled')
@@ -162,6 +163,7 @@ class ExcelMergerApp:
 
     def show_sheet_content(self, sheet_name):
         self.active_sheet_name = sheet_name
+        self.preview_label.config(text=f'Предпросмотр: "{sheet_name}"')
         self.update_active_sheet_highlight()
         df = None
         if self.last_merge_file_path:
@@ -201,6 +203,7 @@ class ExcelMergerApp:
 
     def show_merge_preview(self):
         self.active_sheet_name = None
+        self.preview_label.config(text='Предпросмотр: Результат')
         self.update_active_sheet_highlight()
         self.show_preview(self.preview_df)
 
