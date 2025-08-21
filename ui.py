@@ -61,7 +61,8 @@ class ExcelMergerApp:
         left_frame.pack(side='left', fill='y')
         tk.Label(left_frame, text='Листы', bg=DARK_BG, fg=DARK_FG).pack(anchor='nw')
         self.sheet_vars = []  # список (var, name)
-        # Кнопка удалить теперь над списком
+        self.sheet_labels = []  # для выделения активного листа
+        self.active_sheet_name = None
         self.btn_delete_sheets = tk.Button(left_frame, text='Удалить выбранные листы', command=self.delete_selected_sheets, bg=DARK_BTN_BG, fg=DARK_BTN_FG, activebackground=DARK_ACCENT, activeforeground=DARK_FG)
         self.btn_delete_sheets.pack(pady=(5, 0), anchor='nw', fill='x')
         # Фрейм с чекбоксами и скроллбаром
@@ -123,14 +124,72 @@ class ExcelMergerApp:
         for widget in self.sheet_checks_frame.winfo_children():
             widget.destroy()
         self.sheet_vars = []
+        self.sheet_labels = []
         for name in self.sheet_list:
+            row = tk.Frame(self.sheet_checks_frame, bg=DARK_BG)
+            row.pack(fill='x', anchor='w')
             var = tk.BooleanVar(value=False)
-            chk = tk.Checkbutton(self.sheet_checks_frame, text=name, variable=var, anchor='w', width=28, justify='left', bg=DARK_BG, fg=DARK_FG, selectcolor=DARK_ACCENT, activebackground=DARK_ACCENT, activeforeground=DARK_FG)
-            chk.pack(fill='x', anchor='w')
+            chk = tk.Checkbutton(row, variable=var, bg=DARK_BG, fg=DARK_FG, selectcolor=DARK_ACCENT, activebackground=DARK_ACCENT, activeforeground=DARK_FG)
+            chk.pack(side='left')
+            lbl = tk.Label(row, text=name, anchor='w', width=22, justify='left', bg=DARK_BG, fg=DARK_FG, cursor='hand2')
+            lbl.pack(side='left', fill='x', expand=True)
+            lbl.bind('<Button-1>', lambda e, n=name: self.show_sheet_content(n))
             self.sheet_vars.append((var, name))
-        # Обновить скроллбар
+            self.sheet_labels.append((lbl, name))
+        self.update_active_sheet_highlight()
         self.sheet_canvas.update_idletasks()
         self.sheet_canvas.yview_moveto(0)
+
+    def update_active_sheet_highlight(self):
+        for lbl, name in self.sheet_labels:
+            if name == self.active_sheet_name:
+                lbl.config(bg=DARK_HIGHLIGHT, fg=DARK_BG)
+            else:
+                lbl.config(bg=DARK_BG, fg=DARK_FG)
+
+    def show_sheet_content(self, sheet_name):
+        self.active_sheet_name = sheet_name
+        self.update_active_sheet_highlight()
+        df = None
+        if self.last_merge_file_path:
+            import pandas as pd
+            try:
+                df = pd.read_excel(self.last_merge_file_path, sheet_name=sheet_name)
+            except Exception as e:
+                self.text.config(state='normal')
+                self.text.delete('1.0', tk.END)
+                self.text.insert('end', f'Ошибка чтения листа: {e}')
+                self.text.config(state='disabled')
+                return
+        elif self.last_merge_folder_path:
+            import os
+            import pandas as pd
+            folder = self.last_merge_folder_path
+            for fname in os.listdir(folder):
+                if fname.endswith('.xlsx'):
+                    fpath = os.path.join(folder, fname)
+                    try:
+                        xl = pd.ExcelFile(fpath)
+                        if sheet_name in xl.sheet_names:
+                            df = xl.parse(sheet_name)
+                            break
+                    except Exception:
+                        continue
+        if df is not None:
+            self.text.config(state='normal')
+            self.text.delete('1.0', tk.END)
+            self.text.insert('end', df.head(100).to_string(index=False))
+            self.text.config(state='disabled')
+        else:
+            self.text.config(state='normal')
+            self.text.delete('1.0', tk.END)
+            self.text.insert('end', 'Не удалось загрузить лист или он пустой.')
+            self.text.config(state='disabled')
+
+    def show_merge_preview(self):
+        self.active_sheet_name = None
+        self.update_active_sheet_highlight()
+        self.show_preview(self.preview_df)
 
     def delete_selected_sheets(self):
         to_delete = set(name for var, name in self.sheet_vars if var.get())
@@ -177,6 +236,8 @@ class ExcelMergerApp:
         if preview_df is not None:
             self.text.insert('end', preview_df.to_string(index=False))
         self.text.config(state='disabled')
+        self.active_sheet_name = None
+        self.update_active_sheet_highlight()
 
     def export_to_excel(self):
         import os
