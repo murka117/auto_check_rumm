@@ -106,11 +106,13 @@ class ExcelMergerApp:
             self.splash_frames = []
 
     def animate_splash(self):
-        if self.splash_frames:
-            self.splash_label.config(image=self.splash_frames[self.splash_index])
-            self.splash_index = (self.splash_index + 1) % len(self.splash_frames)
-            if self.splash_running:
+        if self.splash_frames and self.splash_running:
+            try:
+                self.splash_label.config(image=self.splash_frames[self.splash_index])
+                self.splash_index = (self.splash_index + 1) % len(self.splash_frames)
                 self.root.after(60, self.animate_splash)
+            except (tk.TclError, AttributeError):
+                self.splash_running = False
 
     def hide_splash_and_show_main(self):
         self.splash_running = False
