@@ -1,6 +1,9 @@
 import tkinter as tk
 from tkinter import filedialog, messagebox
 from styles import DARK_BG, DARK_FG, DARK_ACCENT, DARK_BTN_BG, DARK_BTN_FG, DARK_ENTRY_BG, DARK_ENTRY_FG, DARK_HIGHLIGHT
+from styles import DARK_BTN_PREVIEW_ACTIVE, DARK_BTN_PREVIEW_INACTIVE
+from styles import DARK_BTN_PREVIEW_ACTIVE, DARK_BTN_PREVIEW_INACTIVE
+from styles import DARK_BTN_PREVIEW_ACTIVE, DARK_BTN_PREVIEW_INACTIVE
 from logic import (
     get_sheet_names_from_file,
     get_sheet_names_from_folder,
@@ -55,6 +58,10 @@ class ExcelMergerApp:
         self.btn_folder.pack(side='left', padx=5, pady=5)
         self.btn_export = tk.Button(top_frame, text='Выгрузить в Excel', command=self.export_to_excel, state='disabled', bg=DARK_BTN_BG, fg=DARK_BTN_FG, activebackground=DARK_ACCENT, activeforeground=DARK_FG)
         self.btn_export.pack(side='left', padx=5, pady=5)
+    # Кнопка возврата к предпросмотру
+    
+        self.btn_show_preview = tk.Button(top_frame, text='К предпросмотру', command=self.show_merge_preview, state='disabled', bg=DARK_BTN_PREVIEW_INACTIVE, fg=DARK_BTN_FG, activebackground=DARK_ACCENT, activeforeground=DARK_FG)
+        self.btn_show_preview.pack(side='left', padx=5, pady=5)
 
         # Список листов слева с чекбоксами
         left_frame = tk.Frame(self.main_frame, width=220, bg=DARK_BG)
@@ -131,7 +138,7 @@ class ExcelMergerApp:
             var = tk.BooleanVar(value=False)
             chk = tk.Checkbutton(row, variable=var, bg=DARK_BG, fg=DARK_FG, selectcolor=DARK_ACCENT, activebackground=DARK_ACCENT, activeforeground=DARK_FG)
             chk.pack(side='left')
-            lbl = tk.Label(row, text=name, anchor='w', width=22, justify='left', bg=DARK_BG, fg=DARK_FG, cursor='hand2')
+            lbl = tk.Label(row, text=name, anchor='w', justify='left', bg=DARK_BG, fg=DARK_FG, cursor='hand2')
             lbl.pack(side='left', fill='x', expand=True)
             lbl.bind('<Button-1>', lambda e, n=name: self.show_sheet_content(n))
             self.sheet_vars.append((var, name))
@@ -146,6 +153,12 @@ class ExcelMergerApp:
                 lbl.config(bg=DARK_HIGHLIGHT, fg=DARK_BG)
             else:
                 lbl.config(bg=DARK_BG, fg=DARK_FG)
+        # Кнопка предпросмотра активна только если выбран отдельный лист
+        from styles import DARK_BTN_PREVIEW_ACTIVE, DARK_BTN_PREVIEW_INACTIVE
+        if self.active_sheet_name:
+            self.btn_show_preview.config(state='normal', bg=DARK_BTN_PREVIEW_ACTIVE)
+        else:
+            self.btn_show_preview.config(state='disabled', bg=DARK_BTN_PREVIEW_INACTIVE)
 
     def show_sheet_content(self, sheet_name):
         self.active_sheet_name = sheet_name
@@ -211,8 +224,7 @@ class ExcelMergerApp:
             self.update_sheet_list()
             self.last_merge_file_path = file_path
             self.last_merge_folder_path = None
-            result_path, preview_df = merge_sheets_in_file(file_path, self.sheet_list)
-            self.last_result_path = result_path
+            preview_df = merge_sheets_in_file(file_path, self.sheet_list)
             self.preview_df = preview_df
             self.show_preview(preview_df)
             self.btn_export.config(state='normal')
@@ -224,8 +236,7 @@ class ExcelMergerApp:
             self.update_sheet_list()
             self.last_merge_folder_path = folder_path
             self.last_merge_file_path = None
-            result_path, preview_df = merge_all_files_in_folder(folder_path, self.sheet_list)
-            self.last_result_path = result_path
+            preview_df = merge_all_files_in_folder(folder_path, self.sheet_list)
             self.preview_df = preview_df
             self.show_preview(preview_df)
             self.btn_export.config(state='normal')
@@ -240,10 +251,7 @@ class ExcelMergerApp:
         self.update_active_sheet_highlight()
 
     def export_to_excel(self):
-        import os
-        if self.last_result_path and os.path.exists(self.last_result_path):
-            messagebox.showinfo('Выгрузка', f'Файл уже сохранён: {self.last_result_path}')
-        elif self.preview_df is not None:
+        if self.preview_df is not None:
             save_path = filedialog.asksaveasfilename(defaultextension='.xlsx', filetypes=[('Excel files', '*.xlsx')])
             if save_path:
                 self.preview_df.to_excel(save_path, index=False)
