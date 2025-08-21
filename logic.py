@@ -52,13 +52,7 @@ def extract_name_and_qty_columns(df):
     result = result.dropna(how='all')
     # Оставить только строки, где есть наименование и количество
     result = result[(result['Наименование'].notna()) & (result['Кол-во'].notna())]
-    # Удалить дубли по наименованию, если есть хотя бы одна строка с Кол-во != 0, оставить её
-    def keep_nonzero_dupes(df):
-        nonzero = df[df['Кол-во'] != 0]
-        if not nonzero.empty:
-            return nonzero.iloc[0]
-        return df.iloc[0]
-    result = result.groupby('Наименование', as_index=False).apply(keep_nonzero_dupes).reset_index(drop=True)
+    # Не удаляем дубли внутри листа — возвращаем все строки
     return result
 
 def normalize_key(s):
@@ -118,8 +112,20 @@ def merge_sheets_in_file(file_path, sheet_list):
         df = pd.read_excel(file_path, sheet_name=sheet_name)
         df_clean = clean_dataframe(df)
         if not df_clean.empty:
+            df_clean['source_sheet'] = sheet_name
             preview_rows.append(df_clean)
     preview_df = pd.concat(preview_rows, ignore_index=True) if preview_rows else pd.DataFrame()
+    # После объединения: если одинаковое наименование встречается на разных листах — оставить только одну строку
+    if not preview_df.empty:
+        def filter_across_sheets(group):
+            if group['source_sheet'].nunique() == 1:
+                return group
+            else:
+                # Оставить первую с ненулевым количеством, иначе первую попавшуюся
+                nonzero = group[group['Кол-во'] != 0]
+                return nonzero.iloc[[0]] if not nonzero.empty else group.iloc[[0]]
+        preview_df = preview_df.groupby('Наименование', group_keys=False).apply(filter_across_sheets).reset_index(drop=True)
+        preview_df = preview_df.drop(columns=['source_sheet'])
     return preview_df
 
 def merge_all_files_in_folder(folder_path, sheet_list):
@@ -135,8 +141,19 @@ def merge_all_files_in_folder(folder_path, sheet_list):
             df = pd.read_excel(file_path, sheet_name=sheet_name)
             df_clean = clean_dataframe(df)
             if not df_clean.empty:
+                df_clean['source_sheet'] = sheet_full_name
                 preview_rows.append(df_clean)
     preview_df = pd.concat(preview_rows, ignore_index=True) if preview_rows else pd.DataFrame()
+    # После объединения: если одинаковое наименование встречается на разных листах — оставить только одну строку
+    if not preview_df.empty:
+        def filter_across_sheets(group):
+            if group['source_sheet'].nunique() == 1:
+                return group
+            else:
+                nonzero = group[group['Кол-во'] != 0]
+                return nonzero.iloc[[0]] if not nonzero.empty else group.iloc[[0]]
+        preview_df = preview_df.groupby('Наименование', group_keys=False).apply(filter_across_sheets).reset_index(drop=True)
+        preview_df = preview_df.drop(columns=['source_sheet'])
     return preview_df
 
 def preview_merge_file(file_path, sheet_list):
