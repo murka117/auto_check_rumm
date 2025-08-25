@@ -245,7 +245,7 @@ class ExcelMergerApp:
             self.update_sheet_list()
             self.last_merge_folder_path = folder_path
             self.last_merge_file_path = None
-            preview_df = merge_all_files_in_folder(folder_path, self.sheet_list)
+            preview_df = merge_all_files_in_folder(folder_path)
             self.preview_df = preview_df
             self.show_preview(preview_df)
             self.btn_export.config(state='normal')

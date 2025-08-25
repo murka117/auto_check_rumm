@@ -1,4 +1,3 @@
-
 import re
 import numpy as np
 from datetime import datetime
@@ -78,13 +77,9 @@ def get_sheet_names_from_file(file_path):
 
 
 def get_sheet_names_from_folder(folder_path):
+    import os
     excel_files = [f for f in os.listdir(folder_path) if f.endswith('.xlsx')]
-    sheet_names = []
-    for file in excel_files:
-        file_path = os.path.join(folder_path, file)
-        wb = load_workbook(file_path, read_only=True)
-        for sheet in wb.sheetnames:
-            sheet_names.append(f'{file} | {sheet}')
+    sheet_names = [os.path.splitext(f)[0] for f in excel_files]
     return sheet_names
 
 
@@ -114,21 +109,25 @@ def merge_sheets_in_file(file_path, sheet_list):
     return preview_df
 
 
-def merge_all_files_in_folder(folder_path, sheet_list):
+def merge_all_files_in_folder(folder_path):
+    import os
+    import pandas as pd
+    from openpyxl import load_workbook
     excel_files = [f for f in os.listdir(folder_path) if f.endswith('.xlsx')]
     preview_rows = []
     for file in excel_files:
         file_path = os.path.join(folder_path, file)
         wb = load_workbook(file_path, read_only=True)
-        for sheet_name in wb.sheetnames:
-            sheet_full_name = f'{file} | {sheet_name}'
-            if sheet_full_name not in sheet_list:
-                continue
-            df = pd.read_excel(file_path, sheet_name=sheet_name)
-            df_clean = clean_dataframe(df)
-            if not df_clean.empty:
-                df_clean['source_sheet'] = sheet_full_name
-                preview_rows.append(df_clean)
+        if not wb.sheetnames:
+            continue
+        first_sheet = wb.sheetnames[0]
+        df = pd.read_excel(file_path, sheet_name=first_sheet)
+        df_clean = clean_dataframe(df)
+        if not df_clean.empty:
+            # Имя листа = имя файла без расширения
+            sheet_name = os.path.splitext(file)[0]
+            df_clean['source_sheet'] = sheet_name
+            preview_rows.append(df_clean)
     preview_df = pd.concat(preview_rows, ignore_index=True) if preview_rows else pd.DataFrame()
     # После объединения: если одинаковое наименование встречается на разных листах — оставить только одну строку
     if not preview_df.empty:
