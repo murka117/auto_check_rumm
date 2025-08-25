@@ -77,9 +77,13 @@ def get_sheet_names_from_file(file_path):
 
 
 def get_sheet_names_from_folder(folder_path):
-    import os
     excel_files = [f for f in os.listdir(folder_path) if f.endswith('.xlsx')]
-    sheet_names = [os.path.splitext(f)[0] for f in excel_files]
+    sheet_names = []
+    for file in excel_files:
+        file_path = os.path.join(folder_path, file)
+        wb = load_workbook(file_path, read_only=True)
+        for sheet in wb.sheetnames:
+            sheet_names.append(f'{file} | {sheet}')
     return sheet_names
 
 
