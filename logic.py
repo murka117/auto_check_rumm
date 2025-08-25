@@ -5,54 +5,36 @@ from datetime import datetime
 
 def extract_name_and_qty_columns(df):
     # Ключевые слова для поиска
-    name_keys = ['наимен', 'опис', 'обозн']
-    qty_keys = ['кол', 'кол-во', 'количество', 'qty', 'count', 'площадь']
-    exclude = ['марка', 'изображ', 'условн', 'фото', 'примеч']
+    import re
     norm_cols = [str(c).replace(' ', '').lower() for c in df.columns]
-    # Найти первый подходящий столбец для наименования
-    name_col = None
+    mark_idx = None
     for i, c in enumerate(norm_cols):
-        if any(k in c for k in name_keys) and not any(e in c for e in exclude):
-            name_col = df.columns[i]
+        if 'марка' in c:
+            mark_idx = i
             break
-    # Найти первый подходящий столбец для количества
-    qty_col = None
-    for i, c in enumerate(norm_cols):
-        if any(k in c for k in qty_keys) and not any(e in c for e in exclude):
-            qty_col = df.columns[i]
-            break
-    # Fallback: если не нашли — взять первые два столбца
-    if name_col is None:
-        name_col = df.columns[0] if len(df.columns) > 0 else None
-    if qty_col is None or qty_col == name_col:
-        # Ищем столбец с максимальным количеством числовых значений (но не совпадающий с name_col)
-        max_numeric = 0
-        best_col = None
-        for col in df.columns:
-            if col == name_col:
-                continue
-            nums = df[col].apply(lambda v: pd.notnull(smart_number(v))).sum()
-            if nums > max_numeric:
-                max_numeric = nums
-                best_col = col
-        qty_col = best_col
-    # Обработка значений
-    name_series = df[name_col].astype(str).str.strip() if name_col else pd.Series(dtype=str)
-    if qty_col:
-        def debug_smart_number(val):
-            parsed = smart_number(val)
-            print(f"DEBUG qty_col: raw='{val}' -> parsed={parsed}")
-            return parsed
-        qty_series = df[qty_col].apply(debug_smart_number)
+    if mark_idx is not None and mark_idx + 2 < len(df.columns):
+        name_col = df.columns[mark_idx + 1]
+        qty_col = df.columns[mark_idx + 2]
+        print(f"DEBUG: Марка найдена, используем {name_col} как Наименование и {qty_col} как Кол-во")
     else:
-        qty_series = pd.Series(dtype=float)
-    # Собрать итоговый DataFrame
+        # Найти первый числовой столбец (без букв, кроме точки/запятой, допускается дата)
+        qty_col = None
+        name_col = None
+        for i, col in enumerate(df.columns):
+            # Проверяем, что большинство значений в столбце — числа или даты
+            vals = df[col].dropna().astype(str)
+            num_like = vals.apply(lambda v: bool(re.match(r'^\s*\d+[\d.,/\s]*$', v)))
+            if num_like.sum() > len(vals) // 2:
+                qty_col = col
+                if i > 0:
+                    name_col = df.columns[i-1]
+                break
+        print(f"DEBUG: Марка не найдена, используем {name_col} как Наименование и {qty_col} как Кол-во")
+    name_series = df[name_col].astype(str).str.strip() if name_col else pd.Series(dtype=str)
+    qty_series = df[qty_col].apply(smart_number) if qty_col else pd.Series(dtype=float)
     result = pd.DataFrame({'Наименование': name_series, 'Кол-во': qty_series})
-    # Удалить полностью пустые строки
     result = result.dropna(how='all')
-    # Оставить только строки, где есть наименование и количество
     result = result[(result['Наименование'].notna()) & (result['Кол-во'].notna())]
-    # Не удаляем дубли внутри листа — возвращаем все строки
     return result
 
 def normalize_key(s):
@@ -89,9 +71,11 @@ import os
 import pandas as pd
 from openpyxl import load_workbook
 
+
 def get_sheet_names_from_file(file_path):
     wb = load_workbook(file_path, read_only=True)
     return [f'{sheet}' for sheet in wb.sheetnames]
+
 
 def get_sheet_names_from_folder(folder_path):
     excel_files = [f for f in os.listdir(folder_path) if f.endswith('.xlsx')]
@@ -102,6 +86,7 @@ def get_sheet_names_from_folder(folder_path):
         for sheet in wb.sheetnames:
             sheet_names.append(f'{file} | {sheet}')
     return sheet_names
+
 
 def merge_sheets_in_file(file_path, sheet_list):
     wb = load_workbook(file_path, read_only=True)
@@ -127,6 +112,7 @@ def merge_sheets_in_file(file_path, sheet_list):
         preview_df = preview_df.groupby('Наименование', group_keys=False).apply(filter_across_sheets).reset_index(drop=True)
         preview_df = preview_df.drop(columns=['source_sheet'])
     return preview_df
+
 
 def merge_all_files_in_folder(folder_path, sheet_list):
     excel_files = [f for f in os.listdir(folder_path) if f.endswith('.xlsx')]
@@ -156,6 +142,7 @@ def merge_all_files_in_folder(folder_path, sheet_list):
         preview_df = preview_df.drop(columns=['source_sheet'])
     return preview_df
 
+
 def preview_merge_file(file_path, sheet_list):
     wb = load_workbook(file_path, read_only=True)
     preview_rows = []
@@ -168,6 +155,7 @@ def preview_merge_file(file_path, sheet_list):
             preview_rows.append(df_clean)
     preview_df = pd.concat(preview_rows, ignore_index=True) if preview_rows else pd.DataFrame()
     return preview_df
+
 
 def preview_merge_folder(folder_path, sheet_list):
     excel_files = [f for f in os.listdir(folder_path) if f.endswith('.xlsx')]

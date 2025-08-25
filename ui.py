@@ -16,6 +16,19 @@ from logic import (
 
 class ExcelMergerApp:
     def __init__(self, root):
+        # Стилизация Treeview (тёмная тема)
+        style = ttk.Style()
+        style.theme_use('default')
+        style.configure('Treeview',
+            background=DARK_ACCENT,
+            foreground=DARK_FG,
+            fieldbackground=DARK_ACCENT,
+            rowheight=28)
+        style.configure('Treeview.Heading',
+            background=DARK_HIGHLIGHT,
+            foreground=DARK_BG,
+            font=('Segoe UI', 10, 'bold'))
+        style.map('Treeview', background=[('selected', DARK_BTN_BG)])
         self.root = root
         self.root.title('Excel Мерджер')
         # Центрируем окно
@@ -34,23 +47,13 @@ class ExcelMergerApp:
         self.last_merge_file_path = None
         self.last_merge_folder_path = None
 
-        # Splash Frame
-        self.splash_frame = tk.Frame(root, width=340, height=300, bg=DARK_BG)
-        self.splash_frame.place(relx=0.5, rely=0.5, anchor='center')
-        self.splash_label = tk.Label(self.splash_frame, bg=DARK_BG)
-        self.splash_label.pack()
-        self.splash_frames = []
-        self.splash_index = 0
-        self.splash_running = True
-        self.load_splash_gif()
-        self.animate_splash()
+    # Splash временно отключён
 
-        # Основной интерфейс (скрыт при старте)
-        self.main_frame = tk.Frame(root, bg=DARK_BG)
+    # Основной интерфейс
+        self.main_frame = tk.Frame(self.root, bg=DARK_BG)
         self.main_frame.pack(fill='both', expand=True)
-        self.main_frame.pack_forget()
 
-        # Верхняя панель с кнопками
+    # Верхняя панель с кнопками
         top_frame = tk.Frame(self.main_frame, bg=DARK_BG)
         top_frame.pack(side='top', fill='x')
         self.btn_file = tk.Button(top_frame, text='Объединить листы в файле', command=self.choose_file_and_merge, bg=DARK_BTN_BG, fg=DARK_BTN_FG, activebackground=DARK_ACCENT, activeforeground=DARK_FG)
@@ -60,14 +63,24 @@ class ExcelMergerApp:
         self.btn_export = tk.Button(top_frame, text='Выгрузить в Excel', command=self.export_to_excel, state='disabled', bg=DARK_BTN_BG, fg=DARK_BTN_FG, activebackground=DARK_ACCENT, activeforeground=DARK_FG)
         self.btn_export.pack(side='left', padx=5, pady=5)
     # Кнопка возврата к предпросмотру
-    
         self.btn_show_preview = tk.Button(top_frame, text='К предпросмотру', command=self.show_merge_preview, state='disabled', bg=DARK_BTN_BG, fg=DARK_BTN_FG, activebackground=DARK_ACCENT, activeforeground=DARK_FG)
         self.btn_show_preview.pack(side='left', padx=5, pady=5)
 
-        # Список листов слева с чекбоксами
+    # Список листов слева с чекбоксами
         left_frame = tk.Frame(self.main_frame, width=220, bg=DARK_BG)
         left_frame.pack(side='left', fill='y')
-        tk.Label(left_frame, text='Листы', bg=DARK_BG, fg=DARK_FG).pack(anchor='nw')
+    # --- Label с количеством листов ---
+        self.sheet_count_var = tk.StringVar()
+        self.sheet_count_label = tk.Label(left_frame, textvariable=self.sheet_count_var, bg=DARK_BG, fg=DARK_FG)
+        self.sheet_count_label.pack(anchor='nw')
+    # --- Поле поиска по листам ---
+        search_frame = tk.Frame(left_frame, bg=DARK_BG)
+        search_frame.pack(anchor='nw', fill='x', pady=(2, 4))
+        tk.Label(search_frame, text='Поиск:', bg=DARK_BG, fg=DARK_FG).pack(side='left')
+        self.sheet_search_var = tk.StringVar()
+        self.sheet_search_var.trace_add('write', lambda *a: self.update_sheet_list())
+        self.sheet_search_entry = tk.Entry(search_frame, textvariable=self.sheet_search_var, bg=DARK_ENTRY_BG, fg=DARK_ENTRY_FG, insertbackground=DARK_ENTRY_FG, relief='flat')
+        self.sheet_search_entry.pack(side='left', fill='x', expand=True, padx=(4, 0))
         self.sheet_vars = []  # список (var, name)
         self.sheet_labels = []  # для выделения активного листа
         self.active_sheet_name = None
@@ -88,25 +101,12 @@ class ExcelMergerApp:
         self.sheet_canvas.pack(side='left', fill='both', expand=True)
         self.sheet_scrollbar.pack(side='right', fill='y')
 
-        # Центр — предпросмотр
+    # Центр — предпросмотр
         center_frame = tk.Frame(self.main_frame, bg=DARK_BG)
         center_frame.pack(side='left', fill='both', expand=True)
         self.preview_label = tk.Label(center_frame, text='Предпросмотр: Результат', bg=DARK_BG, fg=DARK_FG)
         self.preview_label.pack(anchor='nw')
-    
-        style = ttk.Style()
-        style.theme_use('default')
-        style.configure('Treeview',
-            background=DARK_ACCENT,
-            foreground=DARK_FG,
-            fieldbackground=DARK_ACCENT,
-            rowheight=28)
-        style.configure('Treeview.Heading',
-            background=DARK_HIGHLIGHT,
-            foreground=DARK_BG,
-            font=('Segoe UI', 10, 'bold'))
-        style.map('Treeview', background=[('selected', DARK_BTN_BG)])
-    # --- Новый layout для Treeview и скроллбаров ---
+    # --- Treeview и скроллбары ---
         tree_frame = tk.Frame(center_frame, bg=DARK_BG)
         tree_frame.pack(fill='both', expand=True, padx=5, pady=5)
         self.tree = ttk.Treeview(tree_frame, show='headings')
@@ -119,44 +119,28 @@ class ExcelMergerApp:
         tree_frame.grid_rowconfigure(0, weight=1)
         tree_frame.grid_columnconfigure(0, weight=1)
 
+    # --- поиск по наименованиям внутри листа и фильтрация Treeview ---
+    # (откат: этой функции нет)
+
         # Скрыть splash через 2.5 секунды и показать основной интерфейс
-        self.root.after(2500, self.hide_splash_and_show_main)
+    # self.root.after(2500, self.hide_splash_and_show_main)  # splash отключён
 
-    def load_splash_gif(self):
-        try:
-            from PIL import Image, ImageTk
-            gif = Image.open('splash.gif')
-            self.splash_frames = []
-            try:
-                while True:
-                    frame = gif.copy().resize((340, 300))
-                    self.splash_frames.append(ImageTk.PhotoImage(frame))
-                    gif.seek(len(self.splash_frames))
-            except EOFError:
-                pass
-        except Exception:
-            self.splash_frames = []
-
-    def animate_splash(self):
-        if self.splash_frames and self.splash_running:
-            try:
-                self.splash_label.config(image=self.splash_frames[self.splash_index])
-                self.splash_index = (self.splash_index + 1) % len(self.splash_frames)
-                self.root.after(60, self.animate_splash)
-            except (tk.TclError, AttributeError):
-                self.splash_running = False
-
-    def hide_splash_and_show_main(self):
-        self.splash_running = False
-        self.splash_frame.destroy()
-        self.main_frame.pack(fill='both', expand=True)
+    # --- splash временно отключён ---
 
     def update_sheet_list(self):
+        # Фильтрация по поиску
+        search = self.sheet_search_var.get().strip().lower() if hasattr(self, 'sheet_search_var') else ''
+        if search:
+            filtered = [name for name in self.sheet_list if search in name.lower()]
+        else:
+            filtered = list(self.sheet_list)
+        # Обновить label с количеством листов
+        self.sheet_count_var.set(f'Листы ({len(filtered)})')
         for widget in self.sheet_checks_frame.winfo_children():
             widget.destroy()
         self.sheet_vars = []
         self.sheet_labels = []
-        for name in self.sheet_list:
+        for name in filtered:
             row = tk.Frame(self.sheet_checks_frame, bg=DARK_BG)
             row.pack(fill='x', anchor='w')
             var = tk.BooleanVar(value=False)
@@ -262,10 +246,13 @@ class ExcelMergerApp:
             self.btn_export.config(state='normal')
 
     def show_preview(self, preview_df):
+        self.preview_df = preview_df
         self.tree.delete(*self.tree.get_children())
         self.tree['columns'] = ()
-        # Используем column #0 для нумерации строк (визуально, не в данных)
         self.tree['show'] = 'tree headings'
+        # Сбросить поле поиска по наименованиям при новом предпросмотре
+        if hasattr(self, 'name_search_var'):
+            self.name_search_var.set('')
         if preview_df is not None and not preview_df.empty:
             columns = list(preview_df.columns)
             self.tree['columns'] = columns
@@ -273,16 +260,13 @@ class ExcelMergerApp:
             self.tree.column('#0', anchor='center', width=60, minwidth=50, stretch=False)
             for col in preview_df.columns:
                 self.tree.heading(col, text=col)
-                # Увеличиваем ширину и minwidth для предотвращения обрезки
                 self.tree.column(col, anchor='w', width=200, minwidth=120)
             for idx, (_, row) in enumerate(preview_df.iterrows(), 1):
                 alt = 'alt' if idx % 2 == 0 else ''
                 tags = (alt,) if alt else ()
-                # Добавляем символ ▸ после номера для визуального выделения нумерации
                 num_text = f'{idx} ▸'
                 self.tree.insert('', 'end', text=num_text, values=list(row), tags=tags)
             self.tree.tag_configure('alt', background='#23262b')
-            # Общий стиль для строк и заголовков
             style = ttk.Style()
             style.configure('Treeview', rowheight=28)
             style.configure('Treeview.Item', font=('Segoe UI', 10))
