@@ -195,18 +195,23 @@ class ExcelMergerApp:
                     except Exception:
                         continue
         if df is not None:
-            self.show_preview(df)
+            # Только отображаем, не меняем self.preview_df!
+            self.show_preview(df, is_sheet_preview=True)
         else:
             self.show_tree_error('Не удалось загрузить лист или он пустой.')
 
     def show_merge_preview(self):
         self.active_sheet_name = None
         self.preview_label.config(text='Предпросмотр: Результат')
-        self.update_active_sheet_highlight()
         # Сбросить выделение чекбоксов
         for var, _ in self.sheet_vars:
             var.set(False)
+        # Сбросить фильтр по результату
+        if hasattr(self, 'result_search_var'):
+            self.result_search_var.set('')
         self.show_preview(self.preview_df)
+        self.update_active_sheet_highlight()
+        self.btn_show_preview.config(state='disabled', bg=DARK_BTN_BG, fg=DARK_BTN_FG)
 
     def delete_selected_sheets(self):
         to_delete = set(name for var, name in self.sheet_vars if var.get())
@@ -245,8 +250,9 @@ class ExcelMergerApp:
             self.show_preview(preview_df)
             self.btn_export.config(state='normal')
 
-    def show_preview(self, preview_df):
-        self.preview_df = preview_df
+    def show_preview(self, preview_df, is_sheet_preview=False):
+        if not is_sheet_preview:
+            self.preview_df = preview_df
         self.tree.delete(*self.tree.get_children())
         self.tree['columns'] = ()
         self.tree['show'] = 'tree headings'
