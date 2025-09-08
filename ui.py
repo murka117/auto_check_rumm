@@ -16,6 +16,9 @@ from logic import (
 
 class ExcelMergerApp:
     def __init__(self, root):
+        # Кнопка возврата в меню (правый верхний угол)
+        return_btn = tk.Button(root, text='⟵ В меню', command=root.destroy, bg='#e8e8ff', fg='#222', relief='flat', font=("Segoe UI", 10, "bold"))
+        return_btn.place(relx=1.0, x=-140, y=8, anchor='ne', width=120, height=32)
         # Стилизация Treeview (тёмная тема)
         style = ttk.Style()
         style.theme_use('default')
