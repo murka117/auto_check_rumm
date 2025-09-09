@@ -1,3 +1,4 @@
+
 import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
@@ -6,6 +7,17 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import tkinter.filedialog as fd
 from mop_logic import clean_and_aggregate, build_final_table_multi
+from styles import (
+    DARK_BG, DARK_FG, DARK_ACCENT, DARK_BTN_BG, DARK_BTN_FG, DARK_ENTRY_BG, DARK_ENTRY_FG, DARK_HIGHLIGHT,
+    DARK_BTN_PREVIEW_ACTIVE, DARK_BTN_PREVIEW_INACTIVE
+)
+
+# Функция для применения стилей ttk
+def apply_styles(style):
+    style.theme_use('default')
+    style.configure('Treeview', background=DARK_BG, foreground=DARK_FG, fieldbackground=DARK_BG, rowheight=28)
+    style.configure('Treeview.Heading', background=DARK_HIGHLIGHT, foreground=DARK_FG, font=('Segoe UI', 10, 'bold'))
+    style.map('Treeview', background=[('selected', DARK_HIGHLIGHT)])
 
 class MopApp(tk.Toplevel):
     def show_floor_table(self, floor):
@@ -75,7 +87,7 @@ class MopApp(tk.Toplevel):
     def __init__(self, master=None):
         super().__init__(master)
         self.title('Проверка Excel по этажам')
-                # Центрирование окна
+        # Центрирование окна
         window_width = 1200
         window_height = 700
         screen_width = self.winfo_screenwidth()
@@ -83,32 +95,29 @@ class MopApp(tk.Toplevel):
         x = (screen_width // 2) - (window_width // 2)
         y = (screen_height // 2) - (window_height // 2)
         self.geometry(f'{window_width}x{window_height}+{x}+{y}')
-        self.configure(bg='#222')
+        self.configure(bg=DARK_BG)
         self.lift()
         self.attributes('-topmost', True)
         self.focus_force()
         self.after(100, lambda: self.attributes('-topmost', False))
-                # --- Стилизация Treeview (тёмная тема) ---
+        # --- Стилизация Treeview (тёмная тема) ---
         self.style = ttk.Style()
-        self.style.theme_use('default')
-        self.style.configure('Treeview', background='#2a2d36', foreground='#000', fieldbackground='#2a2d36', rowheight=28)
-        self.style.configure('Treeview.Heading', background='#444', foreground='#000', font=('Segoe UI', 10, 'bold'))
-        self.style.map('Treeview', background=[('selected', '#444')])
+        apply_styles(self.style)
 
-                # --- Основной интерфейс ---
-        self.main_frame = tk.Frame(self, bg='#222')
+        # --- Основной интерфейс ---
+        self.main_frame = tk.Frame(self, bg=DARK_BG)
         self.main_frame.pack(fill='both', expand=True)
 
-    # --- Верхняя панель с кнопками ---
-        top_frame = tk.Frame(self.main_frame, bg='#222')
+        # --- Верхняя панель с кнопками ---
+        top_frame = tk.Frame(self.main_frame, bg=DARK_BG)
         top_frame.pack(side='top', fill='x')
-        tk.Button(top_frame, text='Открыть Excel', command=self.open_file, bg='#333', fg='#fff').pack(side='left', padx=5, pady=5)
-        tk.Button(top_frame, text='Обработать папку', command=self.open_folder, bg='#333', fg='#fff').pack(side='left', padx=5, pady=5)
+        tk.Button(top_frame, text='Открыть Excel', command=self.open_file, bg=DARK_BTN_BG, fg=DARK_BTN_FG).pack(side='left', padx=5, pady=5)
+        tk.Button(top_frame, text='Обработать папку', command=self.open_folder, bg=DARK_BTN_BG, fg=DARK_BTN_FG).pack(side='left', padx=5, pady=5)
         self.btn_export = tk.Button(top_frame, text='Экспортировать в Excel', command=self.export_to_excel, state='disabled', bg='#e8ffe8', fg='#222', relief='groove')
         self.btn_export.pack(side='left', padx=5, pady=5)
-        mult_frame = tk.Frame(top_frame, bg='#222')
+        mult_frame = tk.Frame(top_frame, bg=DARK_BG)
         mult_frame.pack(side='left', padx=10)
-        tk.Label(mult_frame, text='Типовой этаж:', fg='#fff', bg='#222').grid(row=0, column=0)
+        tk.Label(mult_frame, text='Типовой этаж:', fg=DARK_FG, bg=DARK_BG).grid(row=0, column=0)
         self.typical_floor = tk.StringVar()
         self.typical_mult = tk.StringVar(value='1')
         self.typical_floor_cb = ttk.Combobox(mult_frame, values=[], textvariable=self.typical_floor, state='readonly', width=8)
