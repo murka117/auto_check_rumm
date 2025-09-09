@@ -118,63 +118,31 @@ class MopApp(tk.Toplevel):
         entry.grid(row=0, column=3, padx=5)
         tk.Button(mult_frame, text='Умножить', command=self.apply_multiplier, bg='#333', fg='#fff').grid(row=0, column=4, padx=5)
     def open_folder(self):
+        import tempfile
+        import os
+        import pandas as pd
         folder_path = fd.askdirectory(title='Выберите папку с Excel-файлами')
         if not folder_path:
             return
-        all_floors = {}
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx')
+        temp_path = temp_file.name
+        temp_file.close()
+        writer = pd.ExcelWriter(temp_path, engine='openpyxl')
         for fname in os.listdir(folder_path):
             if fname.endswith('.xlsx') or fname.endswith('.xls'):
                 fpath = os.path.join(folder_path, fname)
                 try:
-                    xl = pd.ExcelFile(fpath)
-                    floors = clean_and_aggregate(xl)
-                    for floor, df in floors.items():
-                        if floor not in all_floors:
-                            all_floors[floor] = []
-                        all_floors[floor].append(df)
-                except Exception:
+                    df = pd.read_excel(fpath, header=None)
+                    sheet_name = os.path.splitext(fname)[0][:31]
+                    df.to_excel(writer, sheet_name=sheet_name, index=False, header=False)
+                except Exception as e:
+                    print(f'Ошибка при обработке файла {fname}: {e}')
                     continue
-        # Объединить по этажам
-        self.floors = {}
-        for floor, dfs in all_floors.items():
-            self.floors[floor] = pd.concat(dfs, ignore_index=True).groupby(['Марка_norm', 'Наименование_norm'], as_index=False).agg({'Марка':'first', 'Наименование':'first', 'Количество':'sum'})
-        self.multipliers = {f: tk.IntVar(value=1) for f in self.floors}
-        self.sheet_list = []
-        for floor, df in self.floors.items():
-            for name in df['Наименование'].unique():
-                self.sheet_list.append(f'{floor}: {name}')
-        self.update_sheet_list()
-        self.recalc()
+        writer.close()
+        # Только объединяем и вызываем open_file, интерфейс не трогаем
+        self.open_file(path=temp_path)
     # ...existing code...
 
-                # --- Боковая панель с листами, поиском и чекбоксами ---
-        left_frame = tk.Frame(self.main_frame, width=220, bg='#222')
-        left_frame.pack(side='left', fill='y')
-        self.sheet_count_var = tk.StringVar()
-        self.sheet_count_label = tk.Label(left_frame, textvariable=self.sheet_count_var, bg='#222', fg='#fff')
-        self.sheet_count_label.pack(anchor='nw')
-        search_frame = tk.Frame(left_frame, bg='#222')
-        search_frame.pack(anchor='nw', fill='x', pady=(2, 4))
-        tk.Label(search_frame, text='Поиск:', bg='#222', fg='#fff').pack(side='left')
-        self.sheet_search_var = tk.StringVar()
-        self.sheet_search_var.trace_add('write', lambda *a: self.update_sheet_list())
-        self.sheet_search_entry = tk.Entry(search_frame, textvariable=self.sheet_search_var, bg='#333', fg='#fff', insertbackground='#fff', relief='flat')
-        self.sheet_search_entry.pack(side='left', fill='x', expand=True, padx=(4, 0))
-        self.sheet_vars = []
-        self.sheet_labels = []
-        self.active_sheet_name = None
-        self.btn_delete_sheets = tk.Button(left_frame, text='Удалить выбранные листы', command=self.delete_selected_sheets, bg='#333', fg='#fff')
-        self.btn_delete_sheets.pack(pady=(5, 0), anchor='nw', fill='x')
-        sheet_list_frame = tk.Frame(left_frame, bg='#222')
-        sheet_list_frame.pack(fill='both', expand=True, padx=5, pady=5)
-        self.sheet_canvas = tk.Canvas(sheet_list_frame, bg='#222', highlightthickness=0)
-        self.sheet_scrollbar = tk.Scrollbar(sheet_list_frame, orient='vertical', command=self.sheet_canvas.yview)
-        self.sheet_checks_frame = tk.Frame(self.sheet_canvas, bg='#222')
-        self.sheet_checks_frame.bind('<Configure>', lambda e: self.sheet_canvas.configure(scrollregion=self.sheet_canvas.bbox('all')))
-        self.sheet_canvas.create_window((0, 0), window=self.sheet_checks_frame, anchor='nw')
-        self.sheet_canvas.configure(yscrollcommand=self.sheet_scrollbar.set)
-        self.sheet_canvas.pack(side='left', fill='both', expand=True)
-        self.sheet_scrollbar.pack(side='right', fill='y')
 
     # --- Центр — предпросмотр ---
         center_frame = tk.Frame(self.main_frame, bg='#222')
@@ -193,26 +161,39 @@ class MopApp(tk.Toplevel):
         self.tree_scroll_x.grid(row=1, column=0, sticky='ew')
         tree_frame.grid_rowconfigure(0, weight=1)
         tree_frame.grid_columnconfigure(0, weight=1)
-    def open_file(self):
-        path = fd.askopenfilename(title='Выберите Excel-файл', filetypes=[('Excel files', '*.xlsx *.xls')])
+    def open_file(self, path=None):
+        import traceback
+        # Полностью пересоздаём все панели и переменные, чтобы не было дублей
+        # Удаляем старый center_frame и все связанные виджеты предпросмотра
+        if hasattr(self, 'center_frame') and self.center_frame is not None:
+            try:
+                self.center_frame.destroy()
+            except Exception:
+                pass
+            self.center_frame = None
+        for attr in ['floor_btns_frame', 'tree_frame', 'preview_label', 'tree', 'tree_scroll', 'tree_scroll_x']:
+            if hasattr(self, attr):
+                widget = getattr(self, attr)
+                if widget is not None:
+                    try:
+                        widget.destroy()
+                    except Exception:
+                        pass
+                setattr(self, attr, None)
+        if path is None:
+            path = fd.askopenfilename(title='Выберите Excel-файл', filetypes=[('Excel files', '*.xlsx *.xls')])
         if not path:
             return
-        import traceback
         try:
             xl = pd.ExcelFile(path)
             self.floors = clean_and_aggregate(xl)
             print('DEBUG self.floors:', {k: v.shape for k, v in self.floors.items()})
             self.multipliers = {f: tk.IntVar(value=1) for f in self.floors}
-            # Определяем этажи
             floor_nums = sorted([str(f) for f in self.floors if f not in ('0', '00', '-1')], key=lambda x: (len(x), x))
             self.typical_floor_cb['values'] = floor_nums
             if floor_nums:
                 self.typical_floor.set(floor_nums[0])
-
             # --- КОМПАКТНЫЕ КНОПКИ В ВЕРХНЕЙ ПАНЕЛИ ---
-            if hasattr(self, 'floor_btns_frame') and self.floor_btns_frame:
-                self.floor_btns_frame.destroy()
-            # Найти top_frame (верхняя панель)
             top_frame = None
             for widget in self.main_frame.winfo_children():
                 if isinstance(widget, tk.Frame) and widget.winfo_manager() == 'pack' and widget.pack_info().get('side') == 'top':
@@ -223,8 +204,6 @@ class MopApp(tk.Toplevel):
                 top_frame.pack(side='top', fill='x')
             self.floor_btns_frame = tk.Frame(top_frame, bg='#222')
             self.floor_btns_frame.pack(side='left', padx=10)
-
-            # Кнопки управления (row=0)
             col0 = 0
             btn_result = tk.Button(self.floor_btns_frame, text='Результат', width=7, height=1, font=('Segoe UI', 9), command=lambda: self.show_table(), bg='#e8ffe8', fg='#222')
             btn_result.grid(row=0, column=col0, padx=2, pady=2)
@@ -237,35 +216,33 @@ class MopApp(tk.Toplevel):
             if basement_floors:
                 btn_basement = tk.Button(self.floor_btns_frame, text='Подвал', width=7, height=1, font=('Segoe UI', 9), command=lambda: self.show_preview(self.floors[basement_floors[0]], is_sheet_preview='blue'), bg='#1a2340', fg='#fff')
                 btn_basement.grid(row=0, column=col0, padx=2, pady=2)
-
-            # Кнопки этажей (row=1+)
             max_cols = 8
             for idx, f in enumerate(floor_nums):
                 row = idx // max_cols + 1
                 col = idx % max_cols
                 btn = tk.Button(self.floor_btns_frame, text=f, width=3, height=1, font=('Segoe UI', 9), command=lambda fl=f: self.show_preview(self.floors[fl], is_sheet_preview='blue'), bg='#1a2340', fg='#fff')
                 btn.grid(row=row, column=col, padx=1, pady=1)
-
-            # Гарантируем, что self.tree_frame существует
-            if not hasattr(self, 'tree_frame') or self.tree_frame is None:
-                center_frame = tk.Frame(self.main_frame, bg='#222')
-                center_frame.pack(side='left', fill='both', expand=True)
-                self.preview_label = tk.Label(center_frame, text='Предпросмотр: Результат', bg='#222', fg='#fff')
-                self.preview_label.pack(anchor='nw')
-                tree_frame = tk.Frame(center_frame, bg='#222')
-                tree_frame.pack(fill='both', expand=True, padx=5, pady=5)
-                self.tree_frame = tree_frame
-                self.tree = ttk.Treeview(tree_frame, show='headings')
-                self.tree_scroll = ttk.Scrollbar(tree_frame, orient='vertical', command=self.tree.yview)
-                self.tree_scroll_x = ttk.Scrollbar(tree_frame, orient='horizontal', command=self.tree.xview)
-                self.tree.configure(yscrollcommand=self.tree_scroll.set, xscrollcommand=self.tree_scroll_x.set)
-                self.tree.grid(row=0, column=0, sticky='nsew')
-                self.tree_scroll.grid(row=0, column=1, sticky='ns')
-                self.tree_scroll_x.grid(row=1, column=0, sticky='ew')
-                tree_frame.grid_rowconfigure(0, weight=1)
-                tree_frame.grid_columnconfigure(0, weight=1)
+            # --- Центр — предпросмотр ---
+            self.center_frame = tk.Frame(self.main_frame, bg='#222')
+            self.center_frame.pack(side='left', fill='both', expand=True)
+            self.preview_label = tk.Label(self.center_frame, text='Предпросмотр: Результат', bg='#222', fg='#fff')
+            self.preview_label.pack(anchor='nw')
+            tree_frame = tk.Frame(self.center_frame, bg='#222')
+            tree_frame.pack(fill='both', expand=True, padx=5, pady=5)
+            self.tree_frame = tree_frame
+            self.tree = ttk.Treeview(tree_frame, show='headings')
+            self.tree_scroll = ttk.Scrollbar(tree_frame, orient='vertical', command=self.tree.yview)
+            self.tree_scroll_x = ttk.Scrollbar(tree_frame, orient='horizontal', command=self.tree.xview)
+            self.tree.configure(yscrollcommand=self.tree_scroll.set, xscrollcommand=self.tree_scroll_x.set)
+            self.tree.grid(row=0, column=0, sticky='nsew')
+            self.tree_scroll.grid(row=0, column=1, sticky='ns')
+            self.tree_scroll_x.grid(row=1, column=0, sticky='ew')
+            tree_frame.grid_rowconfigure(0, weight=1)
+            tree_frame.grid_columnconfigure(0, weight=1)
             self.recalc()
             print('DEBUG final_df:', getattr(self, 'final_df', None))
+            if hasattr(self, 'btn_export') and self.btn_export:
+                self.btn_export.config(state='normal')
         except Exception as e:
             tb = traceback.format_exc()
             messagebox.showerror('Ошибка', f'Не удалось загрузить файл:\n{e}\n\nTraceback:\n{tb}')
