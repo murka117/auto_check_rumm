@@ -1,3 +1,9 @@
+import sys
+# --- PyInstaller resource path helper ---
+def resource_path(relative_path):
+    if hasattr(sys, '_MEIPASS'):
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.abspath(relative_path)
 import tkinter as tk
 from PIL import Image, ImageTk, ImageSequence
 import os
@@ -7,7 +13,7 @@ from styles import DARK_BG, DARK_FG, DARK_ACCENT, MENU_WIDTH, MENU_HEIGHT, MENU_
 
 # --- SplashScreen класс (адаптирован из auto_check_MOP) ---
 class SplashScreen(tk.Toplevel):
-    def __init__(self, master=None, gif_path='splash.gif', icon_path=None, duration=2.0, **kwargs):
+    def __init__(self, master=None, gif_path=None, icon_path=None, duration=2.0, **kwargs):
         super().__init__(master, **kwargs)
         self.overrideredirect(True)
         self.configure(bg='#23262b')
@@ -21,7 +27,8 @@ class SplashScreen(tk.Toplevel):
                 self.iconbitmap(icon_path)
             except Exception:
                 pass
-        self.load_gif(gif_path)
+        if gif_path:
+            self.load_gif(gif_path)
         self.attributes('-alpha', 0.0)
         self.fade_in()
         self.after(0, self.play_gif)
@@ -109,7 +116,7 @@ def show_mode_menu():
 if __name__ == '__main__':
     root = tk.Tk()
     root.withdraw()
-    splash = SplashScreen(master=root, gif_path='splash.gif', icon_path='iconn.ico', duration=2.0)
+    splash = SplashScreen(master=root, gif_path=resource_path('splash.gif'), icon_path=resource_path('iconn.ico'), duration=2.0)
     def after_splash():
         root.destroy()
         show_mode_menu()
