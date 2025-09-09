@@ -132,6 +132,7 @@ class MopApp(tk.Toplevel):
         folder_path = fd.askdirectory(title='Выберите папку с Excel-файлами')
         if not folder_path:
             return
+        # Только если выбрана папка — объединяем и вызываем open_file
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx')
         temp_path = temp_file.name
         temp_file.close()
@@ -147,7 +148,6 @@ class MopApp(tk.Toplevel):
                     print(f'Ошибка при обработке файла {fname}: {e}')
                     continue
         writer.close()
-        # Только объединяем и вызываем open_file, интерфейс не трогаем
         self.open_file(path=temp_path)
     # ...existing code...
 
@@ -155,21 +155,21 @@ class MopApp(tk.Toplevel):
     # (Удалено создание лишней левой панели предпросмотра)
     def open_file(self, path=None):
         import traceback
-        # Полностью очищаем main_frame: удаляем все дочерние виджеты (панели, предпросмотр, кнопки и т.д.)
+        # Диалог выбора файла до любых изменений интерфейса
+        if path is None:
+            path = fd.askopenfilename(title='Выберите Excel-файл', filetypes=[('Excel files', '*.xlsx *.xls')])
+        if not path:
+            return
+        # Только если выбран файл — очищаем и пересоздаём интерфейс
         if hasattr(self, 'main_frame') and self.main_frame is not None:
             for child in self.main_frame.winfo_children():
                 try:
                     child.destroy()
                 except Exception:
                     pass
-        # Сбросить ссылки на панели
         for attr in ['center_frame', 'floor_btns_frame', 'tree_frame', 'preview_label', 'tree', 'tree_scroll', 'tree_scroll_x']:
             if hasattr(self, attr):
                 setattr(self, attr, None)
-        if path is None:
-            path = fd.askopenfilename(title='Выберите Excel-файл', filetypes=[('Excel files', '*.xlsx *.xls')])
-        if not path:
-            return
         try:
             xl = pd.ExcelFile(path)
             self.floors = clean_and_aggregate(xl)
