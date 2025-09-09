@@ -120,8 +120,7 @@ class MopApp(tk.Toplevel):
         tk.Label(mult_frame, text='Типовой этаж:', fg=DARK_FG, bg=DARK_BG).grid(row=0, column=0)
         self.typical_floor = tk.StringVar()
         self.typical_mult = tk.StringVar(value='1')
-        self.typical_floor_cb = ttk.Combobox(mult_frame, values=[], textvariable=self.typical_floor, state='readonly', width=8)
-        self.typical_floor_cb.grid(row=0, column=1, padx=5)
+        self.typical_floor_cb = None  # Combobox будет создан в open_file
         tk.Label(mult_frame, text='Множитель:', fg='#fff', bg='#222').grid(row=0, column=2)
         entry = tk.Entry(mult_frame, textvariable=self.typical_mult, width=5, bg='#333', fg='#fff', insertbackground='#fff')
         entry.grid(row=0, column=3, padx=5)
@@ -153,41 +152,19 @@ class MopApp(tk.Toplevel):
     # ...existing code...
 
 
-    # --- Центр — предпросмотр ---
-        center_frame = tk.Frame(self.main_frame, bg='#222')
-        center_frame.pack(side='left', fill='both', expand=True)
-        self.preview_label = tk.Label(center_frame, text='Предпросмотр: Результат', bg='#222', fg='#fff')
-        self.preview_label.pack(anchor='nw')
-        tree_frame = tk.Frame(center_frame, bg='#222')
-        tree_frame.pack(fill='both', expand=True, padx=5, pady=5)
-        self.tree_frame = tree_frame
-        self.tree = ttk.Treeview(tree_frame, show='headings')
-        self.tree_scroll = ttk.Scrollbar(tree_frame, orient='vertical', command=self.tree.yview)
-        self.tree_scroll_x = ttk.Scrollbar(tree_frame, orient='horizontal', command=self.tree.xview)
-        self.tree.configure(yscrollcommand=self.tree_scroll.set, xscrollcommand=self.tree_scroll_x.set)
-        self.tree.grid(row=0, column=0, sticky='nsew')
-        self.tree_scroll.grid(row=0, column=1, sticky='ns')
-        self.tree_scroll_x.grid(row=1, column=0, sticky='ew')
-        tree_frame.grid_rowconfigure(0, weight=1)
-        tree_frame.grid_columnconfigure(0, weight=1)
+    # (Удалено создание лишней левой панели предпросмотра)
     def open_file(self, path=None):
         import traceback
-        # Полностью пересоздаём все панели и переменные, чтобы не было дублей
-        # Удаляем старый center_frame и все связанные виджеты предпросмотра
-        if hasattr(self, 'center_frame') and self.center_frame is not None:
-            try:
-                self.center_frame.destroy()
-            except Exception:
-                pass
-            self.center_frame = None
-        for attr in ['floor_btns_frame', 'tree_frame', 'preview_label', 'tree', 'tree_scroll', 'tree_scroll_x']:
+        # Полностью очищаем main_frame: удаляем все дочерние виджеты (панели, предпросмотр, кнопки и т.д.)
+        if hasattr(self, 'main_frame') and self.main_frame is not None:
+            for child in self.main_frame.winfo_children():
+                try:
+                    child.destroy()
+                except Exception:
+                    pass
+        # Сбросить ссылки на панели
+        for attr in ['center_frame', 'floor_btns_frame', 'tree_frame', 'preview_label', 'tree', 'tree_scroll', 'tree_scroll_x']:
             if hasattr(self, attr):
-                widget = getattr(self, attr)
-                if widget is not None:
-                    try:
-                        widget.destroy()
-                    except Exception:
-                        pass
                 setattr(self, attr, None)
         if path is None:
             path = fd.askopenfilename(title='Выберите Excel-файл', filetypes=[('Excel files', '*.xlsx *.xls')])
@@ -199,44 +176,56 @@ class MopApp(tk.Toplevel):
             print('DEBUG self.floors:', {k: v.shape for k, v in self.floors.items()})
             self.multipliers = {f: tk.IntVar(value=1) for f in self.floors}
             floor_nums = sorted([str(f) for f in self.floors if f not in ('0', '00', '-1')], key=lambda x: (len(x), x))
-            self.typical_floor_cb['values'] = floor_nums
+
+            # --- Верхняя панель с кнопками и мультипликатором ---
+            top_frame = tk.Frame(self.main_frame, bg=DARK_BG)
+            top_frame.pack(side='top', fill='x')
+            tk.Button(top_frame, text='Открыть Excel', command=self.open_file, bg=DARK_BTN_BG, fg=DARK_BTN_FG).pack(side='left', padx=5, pady=5)
+            tk.Button(top_frame, text='Обработать папку', command=self.open_folder, bg=DARK_BTN_BG, fg=DARK_BTN_FG).pack(side='left', padx=5, pady=5)
+            self.btn_export = tk.Button(top_frame, text='Экспортировать в Excel', command=self.export_to_excel, state='normal', bg='#e8ffe8', fg='#222', relief='groove')
+            self.btn_export.pack(side='left', padx=5, pady=5)
+            mult_frame = tk.Frame(top_frame, bg=DARK_BG)
+            mult_frame.pack(side='left', padx=10)
+            tk.Label(mult_frame, text='Типовой этаж:', fg=DARK_FG, bg=DARK_BG).grid(row=0, column=0)
+            self.typical_floor = tk.StringVar()
+            self.typical_mult = tk.StringVar(value='1')
+            self.typical_floor_cb = ttk.Combobox(mult_frame, values=floor_nums, textvariable=self.typical_floor, state='readonly', width=8)
+            self.typical_floor_cb.grid(row=0, column=1, padx=5)
             if floor_nums:
                 self.typical_floor.set(floor_nums[0])
+            tk.Label(mult_frame, text='Множитель:', fg=DARK_FG, bg=DARK_BG).grid(row=0, column=2)
+            entry = tk.Entry(mult_frame, textvariable=self.typical_mult, width=5, bg=DARK_BTN_BG, fg=DARK_BTN_FG, insertbackground=DARK_FG)
+            entry.grid(row=0, column=3, padx=5)
+            tk.Button(mult_frame, text='Умножить', command=self.apply_multiplier, bg=DARK_BTN_BG, fg=DARK_BTN_FG).grid(row=0, column=4, padx=5)
+
             # --- КОМПАКТНЫЕ КНОПКИ В ВЕРХНЕЙ ПАНЕЛИ ---
-            top_frame = None
-            for widget in self.main_frame.winfo_children():
-                if isinstance(widget, tk.Frame) and widget.winfo_manager() == 'pack' and widget.pack_info().get('side') == 'top':
-                    top_frame = widget
-                    break
-            if not top_frame:
-                top_frame = tk.Frame(self.main_frame, bg='#222')
-                top_frame.pack(side='top', fill='x')
-            self.floor_btns_frame = tk.Frame(top_frame, bg='#222')
+            self.floor_btns_frame = tk.Frame(top_frame, bg=DARK_BG)
             self.floor_btns_frame.pack(side='left', padx=10)
             col0 = 0
             btn_result = tk.Button(self.floor_btns_frame, text='Результат', width=7, height=1, font=('Segoe UI', 9), command=lambda: self.show_table(), bg='#e8ffe8', fg='#222')
             btn_result.grid(row=0, column=col0, padx=2, pady=2)
             col0 += 1
             if '0' in self.floors:
-                btn_svod = tk.Button(self.floor_btns_frame, text='Свод', width=7, height=1, font=('Segoe UI', 9), command=lambda: self.show_preview(self.floors['0'], is_sheet_preview='blue'), bg='#1a2340', fg='#fff')
+                btn_svod = tk.Button(self.floor_btns_frame, text='Свод', width=7, height=1, font=('Segoe UI', 9), command=lambda: self.show_preview(self.floors['0'], is_sheet_preview='blue'), bg=DARK_BTN_PREVIEW_ACTIVE, fg=DARK_FG)
                 btn_svod.grid(row=0, column=col0, padx=2, pady=2)
                 col0 += 1
             basement_floors = [f for f in self.floors if str(f) in ('00', '-1')]
             if basement_floors:
-                btn_basement = tk.Button(self.floor_btns_frame, text='Подвал', width=7, height=1, font=('Segoe UI', 9), command=lambda: self.show_preview(self.floors[basement_floors[0]], is_sheet_preview='blue'), bg='#1a2340', fg='#fff')
+                btn_basement = tk.Button(self.floor_btns_frame, text='Подвал', width=7, height=1, font=('Segoe UI', 9), command=lambda: self.show_preview(self.floors[basement_floors[0]], is_sheet_preview='blue'), bg=DARK_BTN_PREVIEW_ACTIVE, fg=DARK_FG)
                 btn_basement.grid(row=0, column=col0, padx=2, pady=2)
             max_cols = 8
             for idx, f in enumerate(floor_nums):
                 row = idx // max_cols + 1
                 col = idx % max_cols
-                btn = tk.Button(self.floor_btns_frame, text=f, width=3, height=1, font=('Segoe UI', 9), command=lambda fl=f: self.show_preview(self.floors[fl], is_sheet_preview='blue'), bg='#1a2340', fg='#fff')
+                btn = tk.Button(self.floor_btns_frame, text=f, width=3, height=1, font=('Segoe UI', 9), command=lambda fl=f: self.show_preview(self.floors[fl], is_sheet_preview='blue'), bg=DARK_BTN_PREVIEW_ACTIVE, fg=DARK_FG)
                 btn.grid(row=row, column=col, padx=1, pady=1)
+
             # --- Центр — предпросмотр ---
-            self.center_frame = tk.Frame(self.main_frame, bg='#222')
+            self.center_frame = tk.Frame(self.main_frame, bg=DARK_BG)
             self.center_frame.pack(side='left', fill='both', expand=True)
-            self.preview_label = tk.Label(self.center_frame, text='Предпросмотр: Результат', bg='#222', fg='#fff')
+            self.preview_label = tk.Label(self.center_frame, text='Предпросмотр: Результат', bg=DARK_BG, fg=DARK_FG)
             self.preview_label.pack(anchor='nw')
-            tree_frame = tk.Frame(self.center_frame, bg='#222')
+            tree_frame = tk.Frame(self.center_frame, bg=DARK_BG)
             tree_frame.pack(fill='both', expand=True, padx=5, pady=5)
             self.tree_frame = tree_frame
             self.tree = ttk.Treeview(tree_frame, show='headings')

@@ -19,5 +19,5 @@ MENU_LABEL_PADY = 30
 MENU_BTN_PADY = 8
 
 # Для кнопки предпросмотра
-DARK_BTN_PREVIEW_ACTIVE = "#3342b4"      # Яркая кнопка предпросмотра
+DARK_BTN_PREVIEW_ACTIVE = "#1e2769"      # Яркая кнопка предпросмотра
 DARK_BTN_PREVIEW_INACTIVE = '#23272e'    # Тёмная неактивная кнопка предпросмотра
